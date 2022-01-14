@@ -4,12 +4,14 @@ from nltk.corpus import stopwords
 import numpy as np
 import re
 import string
+import random
 from nltk.tokenize import TweetTokenizer
 from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 
 all_positive_tweets = twitter_samples.strings('positive_tweets.json')
 all_negative_tweets = twitter_samples.strings('negative_tweets.json')
+
 
 
 def process_tweet(tweet):
@@ -68,11 +70,11 @@ def lookup(freqs, word, label):
 
 
 # splitting the data for training and testing
-train_pos = all_positive_tweets[:3500]
-test_pos = all_positive_tweets[3500:]
+train_pos = all_positive_tweets[:4999]
+test_pos = all_positive_tweets[4999:]
 
-train_neg = all_negative_tweets[:3500]
-test_neg = all_negative_tweets[3500:]
+train_neg = all_negative_tweets[:4999]
+test_neg = all_negative_tweets[4999:]
 
 train_x = train_pos + train_neg
 test_x = test_pos + test_neg
@@ -80,6 +82,7 @@ test_x = test_pos + test_neg
 # numpy array for the labels in the training set
 train_y = np.append(np.ones((len(train_pos))), np.zeros((len(train_neg))))
 test_y = np.append(np.ones((len(test_neg))), np.zeros((len(test_neg))))
+print(test_y)
 
 # Build a frequency dictionary
 freqs = count_tweets(train_x, train_y)
@@ -150,7 +153,7 @@ def naive_bayes_predict(tweet, logprior, loglikelihood):
 def test_naive_bayes(test_x, test_y, logprior, loglikelihood):
     y_hats = []
     goodResult=0
-    for i in range(len(test_x)):
+    for i in range(len(test_y)):
         if naive_bayes_predict(test_x[i], logprior, loglikelihood) > 0:
             y_hat_i = 1
         else:
@@ -158,14 +161,43 @@ def test_naive_bayes(test_x, test_y, logprior, loglikelihood):
         if y_hat_i == test_y[i]:
             goodResult += 1
         y_hats.append(y_hat_i)
-    error = np.mean(np.absolute(test_y - y_hats))
+    error = 1 - goodResult/len(test_y)
     accuracy = 1 - error
     print(goodResult, len(test_x))
 
     return accuracy
 
+categorized_tweets = ([[t, 1] for t in twitter_samples.strings("positive_tweets.json")] +
+                      [[t, 0] for t in twitter_samples.strings("negative_tweets.json")])
 
-test_naive_bayes(test_x, test_y, logprior, loglikelihood)
+def foldCrossValidation(categorized_tweets):
+    accuracy = 0
+    for i in range(10):
+        random.shuffle(categorized_tweets)
+        trainx = []
+        temp = categorized_tweets[:9000]
+        for i in range(len(temp)):
+            trainx.append(temp[i][0])
+        testx = []
+        temp = categorized_tweets[9000:]
+        for i in range(len(temp)):
+            testx.append(temp[i][0])
+
+        trainy = []
+        temp = categorized_tweets[:9000]
+        for i in range(len(temp)):
+            trainy.append(temp[i][1])
+        testy = []
+        temp = categorized_tweets[9000:]
+        for i in range(len(temp)):
+            testy.append(temp[i][1])
+
+        freq = count_tweets(trainx, trainy)
+        prior, likelihood = train_naive_bayes(freq, trainy)
+        accuracy += test_naive_bayes(testx, testy, prior, likelihood)
+    print('foldcross accuracy: {}', accuracy/10)
+
+foldCrossValidation(categorized_tweets)
 """
 tweet = input("Enter a text: ")
 p = naive_bayes_predict(tweet, logprior, loglikelihood)
