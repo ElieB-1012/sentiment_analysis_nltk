@@ -1,33 +1,14 @@
 # http://www.nltk.org/_modules/nltk/sentiment/util.html
 # http://zablo.net/blog/post/twitter-sentiment-analysis-python-scikit-word2vec-nltk-xgboost
 
-from sklearn.svm import LinearSVC
-import random
-from nltk.corpus import twitter_samples
-from nltk.corpus import stopwords
-from nltk import word_tokenize
-
-stop = list(set(stopwords.words('English')))
-
-categorized_tweets = ([(t, "pos") for t in twitter_samples.strings("positive_tweets.json")] +
-                      [(t, "neg") for t in twitter_samples.strings("negative_tweets.json")])
-
-smilies = [':-)', ':)', ';)', ':o)', ':]', ':3', ':c)', ':>', '=]', '8)', '=)', ':}',
-           ':^)', ':-D', ':D', '8-D', '8D', 'x-D', 'xD', 'X-D', 'XD', '=-D', '=D',
-           '=-3', '=3', ':-))', ":'-)", ":')", ':*', ':^*', '>:P', ':-P', ':P', 'X-P',
-           'x-p', 'xp', 'XP', ':-p', ':p', '=p', ':-b', ':b', '>:)', '>;)', '>:-)',
-           '<3', ':L', ':-/', '>:/', ':S', '>:[', ':@', ':-(', ':[', ':-||', '=L', ':<',
-           ':-[', ':-<', '=\\', '=/', '>:(', ':(', '>.<', ":'-(", ":'(", ':\\', ':-c',
-           ':c', ':{', '>:\\', ';(', '(', ')', 'via']
-
-'''categorized_tweets_tokens = []
-for tweet in categorized_tweets:
-    text = tweet[0]
-    for smiley in smilies:
-        text = re.sub(re.escape(smiley), '', text)
-    categorized_tweets_tokens.append((word_tokenize(text), tweet[1]))
-'''
 import re
+import random
+from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import LinearSVC
+from nltk import word_tokenize
+from nltk.corpus import stopwords
+from nltk.corpus import twitter_samples
+from nltk.corpus import sentiwordnet as swn
 
 
 def processTweet(tweet):
@@ -50,25 +31,6 @@ def processTweet(tweet):
     return tweet
 
 
-# end
-for i in range(0, len(categorized_tweets)):
-    categorized_tweets_remove = processTweet(categorized_tweets[i][0])
-categorized_tweets = ([[t, "pos"] for t in twitter_samples.strings("positive_tweets.json")] +
-                      [[t, "neg"] for t in twitter_samples.strings("negative_tweets.json")])
-clean_tweets = []
-for i in range(0, len(categorized_tweets)):
-    clean_tweets.append([processTweet(categorized_tweets[i][0]), categorized_tweets[i][1]])
-
-vocabulary = [w.lower() for i in range(0, len(clean_tweets)) for w in word_tokenize(clean_tweets[i][0]) if
-              w.lower() not in stop and w.lower() not in smilies]
-vocabulary = list(set(vocabulary))
-vocabulary.sort()
-random.shuffle(clean_tweets)
-train = clean_tweets
-tweet = input("Enter a tweet: ")
-print('Predicting.. please wait.. ')
-test = [[processTweet(tweet), 'pos']]
-
 def get_unigram_features(data, vocab):
     fet_vec_all = []
     for tup in data:
@@ -81,9 +43,6 @@ def get_unigram_features(data, vocab):
                 single_feat_vec.append(0)
         fet_vec_all.append(single_feat_vec)
     return fet_vec_all
-
-
-from nltk.corpus import sentiwordnet as swn
 
 
 def get_senti_wordnet_features(data):
@@ -133,6 +92,46 @@ def calculate_precision(prediction, actual):
     return precision
 
 
+stop = list(set(stopwords.words('English')))
+
+categorized_tweets = ([(t, "pos") for t in twitter_samples.strings("positive_tweets.json")] +
+                      [(t, "neg") for t in twitter_samples.strings("negative_tweets.json")])
+
+smilies = [':-)', ':)', ';)', ':o)', ':]', ':3', ':c)', ':>', '=]', '8)', '=)', ':}',
+           ':^)', ':-D', ':D', '8-D', '8D', 'x-D', 'xD', 'X-D', 'XD', '=-D', '=D',
+           '=-3', '=3', ':-))', ":'-)", ":')", ':*', ':^*', '>:P', ':-P', ':P', 'X-P',
+           'x-p', 'xp', 'XP', ':-p', ':p', '=p', ':-b', ':b', '>:)', '>;)', '>:-)',
+           '<3', ':L', ':-/', '>:/', ':S', '>:[', ':@', ':-(', ':[', ':-||', '=L', ':<',
+           ':-[', ':-<', '=\\', '=/', '>:(', ':(', '>.<', ":'-(", ":'(", ':\\', ':-c',
+           ':c', ':{', '>:\\', ';(', '(', ')', 'via']
+
+'''categorized_tweets_tokens = []
+for tweet in categorized_tweets:
+    text = tweet[0]
+    for smiley in smilies:
+        text = re.sub(re.escape(smiley), '', text)
+    categorized_tweets_tokens.append((word_tokenize(text), tweet[1]))
+'''
+
+# end
+for i in range(0, len(categorized_tweets)):
+    categorized_tweets_remove = processTweet(categorized_tweets[i][0])
+categorized_tweets = ([[t, "pos"] for t in twitter_samples.strings("positive_tweets.json")] +
+                      [[t, "neg"] for t in twitter_samples.strings("negative_tweets.json")])
+clean_tweets = []
+for i in range(0, len(categorized_tweets)):
+    clean_tweets.append([processTweet(categorized_tweets[i][0]), categorized_tweets[i][1]])
+
+vocabulary = [w.lower() for i in range(0, len(clean_tweets)) for w in word_tokenize(clean_tweets[i][0]) if
+              w.lower() not in stop and w.lower() not in smilies]
+vocabulary = list(set(vocabulary))
+vocabulary.sort()
+random.shuffle(clean_tweets)
+train = clean_tweets
+tweet = input("Enter a tweet: ")
+print('Predicting.. please wait.. ')
+test = [[processTweet(tweet), 'pos']]
+
 training_unigram_features = get_unigram_features(train, vocabulary)  # vocabulary extracted in the beginning
 training_swn_features = get_senti_wordnet_features(train)
 
@@ -152,8 +151,6 @@ svm_classifier = LinearSVC(penalty='l2', C=0.01).fit(training_features, training
 print("Prediction of linear SVM classifier is:")
 predictions = svm_classifier.predict(test_features)
 print("Prediction Test data\t" + str(predictions))
-
-from sklearn.naive_bayes import GaussianNB
 
 clf = GaussianNB()
 NBClassfier = clf.fit(training_features, training_labels)
